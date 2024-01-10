@@ -9,20 +9,39 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
 	"github.com/nstratos/go-myanimelist/mal"
 	"github.com/spf13/pflag"
 	"github.com/manifoldco/promptui"
+	"github.com/oriser/regroup"
 )
 
 type jsonConfig struct{
 	MalClientID string `json:"malClientID"`
+	LibraryDir string `json:"libraryDir"`
+	ImportDir string `json:"importDir"`
 }
 var config jsonConfig
 
 var mangaDirCleanRegex = regexp.MustCompile(`(?mi)\[.+\]`)
+var mangaRegex = []*regroup.ReGroup{
+	regroup.MustCompile(`(?P<series>.*)c(?P<chapter>\d+\b)`),
+	regroup.MustCompile(`(?P<series>.*)v(?P<chapter>\d+\b)`),
+}
+
+var exts = []string{
+	".cbz",
+	".cbr",
+}
+
+type Manga struct{
+	Name string `regroup:"series"`
+	Chapter int `regroup:"chapter"`
+	Volume int `regroup:"volume"`
+}
 
 type clientIDTransport struct {
 	Transport http.RoundTripper
@@ -96,9 +115,13 @@ func main() {
 		}
 
 		validate := func(input string) error {
-			_, err := strconv.ParseFloat(input, 64)
+			i, err := strconv.ParseUint(input, 10, 0)
 			if err != nil {
 				return errors.New("Invalid number")
+			}
+
+			if i > uint64(len(matches)) {
+				return errors.New("num above amount of matches")
 			}
 			return nil
 		}
@@ -113,7 +136,43 @@ func main() {
 			fmt.Printf("Prompt failed %v\n", err)
 			return
 		}
-		fmt.Println(result)
+
+		resInt, _ := strconv.Atoi(result)
+		mangaTitle := matches[resInt - 1].Title
+		mangaPath := filepath.Join(config.LibraryDir, mangaTitle)
+		os.MkdirAll(mangaPath, os.ModePerm)
+
+		files, _ := os.ReadDir(dir)
+		for _, f := range files {
+			ext := filepath.Ext(f.Name())
+			if !slices.Contains(exts, ext) {
+				continue
+			}
+
+			fmt.Println(f.Name())
+			var mangaInfo Manga
+			for _, rgx := range mangaRegex {
+				err := rgx.MatchToTarget(f.Name(), &mangaInfo)
+				if _, ok := err.(*regroup.UnknownGroupError); err != nil && !ok {
+					fmt.Println(err)
+					continue
+				}
+				break
+			}
+			fmt.Println(mangaInfo)
+
+			fnamePieces := []string{mangaTitle}
+			if mangaInfo.Volume != 0 {
+				fnamePieces = append(fnamePieces, fmt.Sprintf("Vol. %02d", mangaInfo.Volume))
+			}
+			if mangaInfo.Chapter != 0 {
+				fnamePieces = append(fnamePieces, fmt.Sprintf("Ch. %02d", mangaInfo.Chapter))
+			}
+			filename := strings.Join(fnamePieces, " ") + ext
+			fmt.Printf("%s -> %s", filepath.Join(dir, f.Name()), filepath.Join(mangaPath, filename))
+			err := os.Link(filepath.Join(dir, f.Name()), filepath.Join(mangaPath, filename))
+			fmt.Println(err)
+		}
 	}
 }
 
