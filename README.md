@@ -8,5 +8,8 @@ Kavita or Komga.
 # Usage
 Work in progress.
 
+# Todo
+Download manga as well??
+
 # License
 MIT
