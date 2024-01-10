@@ -94,7 +94,11 @@ func main() {
 
 		fmt.Println("Results:")
 		for idx, manga := range matches {
-			fmt.Printf("%d. %s (Volumes: %d, Chapters: %d)\n", idx + 1, manga.Title, manga.NumVolumes, manga.NumChapters)
+			var enTitle string
+			if manga.AlternativeTitles.En != "" {
+				enTitle = " | " + manga.AlternativeTitles.En
+			}
+			fmt.Printf("%d. %s%s\n(Volumes: %d, Chapters: %d)\n", idx + 1, manga.Title, enTitle, manga.NumVolumes, manga.NumChapters)
 			if idx + 1 == len(matches) {
 				fmt.Println("")
 			}
@@ -195,7 +199,7 @@ func setupManga(name, dir string) []mal.Manga {
 	fmt.Printf("searching \"%s\" for directory %s\n", name, dir)
 
 	list, _, err := c.Manga.List(ctx, name,
-		mal.Fields{"rank", "num_volumes", "num_chapters"},
+		mal.Fields{"rank", "num_volumes", "num_chapters", "alternative_titles"},
 		mal.Limit(5),
 	)
 
