@@ -82,6 +82,7 @@ func main() {
 	json.Unmarshal(confFile, &config)
 
 	pflag.StringVarP(&config.LibraryDir, "library", "l", config.LibraryDir, "Where manga is stored")
+	skiplns := pflag.BoolP("skiplns", "L", true, "Should Light Novels be hidden in the results")
 
 	pflag.Parse()
 
@@ -93,9 +94,15 @@ func main() {
 	for _, dir := range dirs {
 		name := mangaName(dir)
 		matches := setupManga(name, dir)
+		var lnSkipped int
 
 		fmt.Println("Results:")
 		for idx, manga := range matches {
+			if *skiplns && manga.MediaType != "manga" {
+				lnSkipped++
+				continue
+			}
+
 			var enTitle string
 			if manga.AlternativeTitles.En != "" {
 				enTitle = " | " + manga.AlternativeTitles.En
@@ -118,6 +125,9 @@ func main() {
 			} else {
 				fmt.Println("")
 			}
+		}
+		if lnSkipped != 0 {
+			fmt.Printf("Skipped %d light novel(s)\n", lnSkipped)
 		}
 
 		validate := func(input string) error {
@@ -201,7 +211,7 @@ func setupManga(name, dir string) []mal.Manga {
 	fmt.Printf("searching \"%s\" for directory %s\n", name, dir)
 
 	list, _, err := c.Manga.List(ctx, name,
-		mal.Fields{"rank", "num_volumes", "num_chapters", "alternative_titles"},
+		mal.Fields{"rank", "num_volumes", "num_chapters", "alternative_titles", "media_type"},
 		mal.Limit(5),
 	)
 
