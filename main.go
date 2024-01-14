@@ -81,6 +81,8 @@ func main() {
 	}
 	json.Unmarshal(confFile, &config)
 
+	pflag.StringVarP(&config.LibraryDir, "library", "l", config.LibraryDir, "Where manga is stored")
+
 	pflag.Parse()
 
 	dirs := pflag.Args()
